@@ -7,6 +7,12 @@ from data_storage_module import DataStorageModule
 from statistics_module import StatisticsModule
 from gui_module import GuiModule
 
+import os
+# if not os.environ.get('XDG_RUNTIME_DIR'):
+    # os.environ['XDG_RUNTIME_DIR'] = f'/tmp/runtime-{os.getuid()}'
+    # os.makedirs(os.environ['XDG_RUNTIME_DIR'], exist_ok=True)
+os.environ['XDG_RUNTIME_DIR'] = f'/tmp/runtime-{os.getuid()}'
+os.makedirs(os.environ['XDG_RUNTIME_DIR'], mode=0o700, exist_ok=True)
 
 class MainModule:
     def __init__(self):
