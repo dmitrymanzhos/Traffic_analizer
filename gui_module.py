@@ -57,9 +57,9 @@ class GuiModule(QWidget):
 
         # Packet Table
         self.packet_table = QTableWidget()
-        self.packet_table.setColumnCount(8)
+        self.packet_table.setColumnCount(9)
         headers = ["Time", "Source IP", "Dest IP", "Protocol", 
-                  "Src Port", "Dst Port", "Length", "Info"]
+                  "Src Port", "Dst Port", "Length", "Info", "TCP flags"]
         self.packet_table.setHorizontalHeaderLabels(headers)
         # self.packet_table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
         self.packet_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
@@ -177,7 +177,28 @@ class GuiModule(QWidget):
                     info_text = "TCP"  # Общая информация для TCP, если нет HTTP
                 elif packet_info.get('protocol'):
                     info_text = packet_info['protocol']
-                    
+                
+
+                info_flags = ""
+                _flags = {
+                    'F': 'FIN',
+                    'S': 'SYN',
+                    'R': 'RST',
+                    'P': 'PSH',
+                    'A': 'ACK',
+                    'U': 'URG',
+                    'E': 'ECE',
+                    'C': 'CWR',
+                }
+                if packet_info.get('protocol') == 'TCP':
+                    # info_flags = str(packet_info['flags'])
+                    # if packet_info['flags'] == 0x01:
+                    #     info_flags =
+                    info_flags = " ".join([_flags[i] for i in list(str(packet_info['flags']))])
+                else:
+                    pass
+
+
                 items = [
                     datetime.fromtimestamp(packet.time).strftime('%H:%M:%S.%f'),
                     packet_info.get('src_ip', ''),
@@ -186,7 +207,8 @@ class GuiModule(QWidget):
                     str(packet_info.get('src_port', '')),
                     str(packet_info.get('dst_port', '')),
                     str(packet_info.get('length', '')),
-                    info_text
+                    info_text,
+                    info_flags
                 ]
                 
                 for col, text in enumerate(items):

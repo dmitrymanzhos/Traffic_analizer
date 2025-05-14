@@ -31,6 +31,7 @@ class PacketProcessingModule:
                 'version': 4 if packet.haslayer(IP) else 6,
                 'timestamp': packet.time,
                 'length': len(packet),
+                # 'flags': '',
                 'dns_query': '',
                 'http_host': '',
                 'tls_sni': ''
