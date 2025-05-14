@@ -165,6 +165,16 @@ class GuiModule(QWidget):
                     continue
                 self.statistics_module.update_statistics(packet_info)
 
+                info_text = ""
+                if packet_info.get('http_host'):
+                    info_text = f"HTTP: {packet_info['http_host']}"
+                elif packet_info.get('dns_query'):
+                    info_text = f"DNS: {packet_info['dns_query']}"
+                elif packet_info.get('protocol') == 'TCP':
+                    info_text = "TCP"  # Общая информация для TCP, если нет HTTP
+                else:
+                    info_text = packet_info.get('protocol', '')
+                    
                 items = [
                     datetime.fromtimestamp(packet.time).strftime('%H:%M:%S.%f'),
                     packet_info.get('src_ip', ''),
@@ -172,8 +182,8 @@ class GuiModule(QWidget):
                     packet_info.get('protocol', ''),
                     str(packet_info.get('src_port', '')),
                     str(packet_info.get('dst_port', '')),
-                    str(len(packet_info.get('payload', b''))),
-                    packet_info.get('http_info', {}).get('method', '')
+                    str(packet_info.get('length', '')),
+                    info_text
                 ]
                 
                 for col, text in enumerate(items):

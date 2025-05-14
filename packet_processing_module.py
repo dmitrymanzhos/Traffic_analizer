@@ -1,4 +1,7 @@
 from scapy.all import IP, IPv6, TCP, UDP, Raw
+from scapy.layers.dns import DNS, DNSQR
+from scapy.layers.http import HTTPRequest
+
 import socket
 from collections import defaultdict
 from loguru import logger
@@ -25,19 +28,53 @@ class PacketProcessingModule:
             
             if not hasattr(ip_layer, 'proto'):
                 return None
-                
+
             # Base packet info
             packet_info = {
                 'src_ip': ip_layer.src,
                 'dst_ip': ip_layer.dst,
                 'version': 4 if packet.haslayer(IP) else 6,
                 'timestamp': packet.time,
-                'length': len(packet)
+                'length': len(packet),
+                'dns_query': '',  # для DNS
+                'http_host': ''   # для HTTP
             }
 
+            # DNS-запросы (UDP)
+            if protocol == socket.IPPROTO_UDP and packet.haslayer(DNS) and packet.haslayer(DNSQR):
+                dns = packet[DNS]
+                if dns.qr == 0:  # QR=0 означает запрос
+                    packet_info['dns_query'] = dns[DNSQR].qname.decode('utf-8', errors='ignore')
+
+            # HTTP-запросы (TCP)
+            if protocol == socket.IPPROTO_TCP and packet.haslayer(TCP):
+                tcp = packet[TCP]
+                if tcp.payload:
+                    raw_payload = bytes(tcp.payload)
+                    try:
+                        if b'Host: ' in raw_payload:  # HTTP-заголовок
+                            http_header = raw_payload.split(b'\r\n')
+                            for header in http_header:
+                                if header.startswith(b'Host: '):
+                                    packet_info['http_host'] = header[6:].decode('utf-8').strip()
+                                    break
+                    except UnicodeDecodeError:
+                        pass
+                        
             # TCP processing
             if protocol == socket.IPPROTO_TCP and packet.haslayer(TCP):
                 tcp = packet[TCP]
+                if tcp.payload:
+                    raw_payload = bytes(tcp.payload)
+                    try:
+                        if b'Host: ' in raw_payload:  # HTTP-заголовок
+                            http_header = raw_payload.split(b'\r\n')
+                            for header in http_header:
+                                if header.startswith(b'Host: '):
+                                    packet_info['http_host'] = header[6:].decode('utf-8').strip()
+                                    break
+                    except UnicodeDecodeError:
+                        pass
                 packet_info.update({
                     'protocol': 'TCP',
                     'src_port': tcp.sport,
