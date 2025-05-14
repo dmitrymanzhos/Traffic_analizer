@@ -7,6 +7,7 @@ from loguru import logger
 class StatisticsModule:
     def __init__(self):
         self.reset_statistics()
+        self.traffic_history = {'timestamps': [], 'bytes': [], 'packets': []}
 
     def reset_statistics(self) -> None:
         """Reset all statistics counters"""
@@ -30,6 +31,11 @@ class StatisticsModule:
             payload_len = len(packet_info.get('payload', b''))
             self.byte_count += payload_len
 
+            current_time = time.time() - self.start_time
+            self.traffic_history['timestamps'].append(current_time)
+            self.traffic_history['bytes'].append(self.byte_count)
+            self.traffic_history['packets'].append(self.packet_count)
+            
             # Protocol statistics
             protocol = packet_info.get('protocol', 'unknown')
             self.protocol_counts[protocol] += 1
@@ -112,12 +118,23 @@ class StatisticsModule:
 
     def get_protocol_distribution(self):
         # Добавьте тестовые данные для проверки
-        return {'TCP': 15, 'UDP': 5, 'ICMP': 3} if not self.protocol_counts else dict(self.protocol_counts)
-        
-    def get_traffic_timeline(self, interval_sec=60) -> Dict[str, list]:
-        """Возвращает временную шкалу трафика"""
+        # return {'TCP': 15, 'UDP': 5, 'ICMP': 3} if not self.protocol_counts else dict(self.protocol_counts)
+        return dict(self.protocol_counts)
+
+    def get_traffic_timeline(self):
+        """Возвращает временную шкалу трафика с инкрементальными значениями"""
+        if len(self.traffic_history['timestamps']) < 2:
+            return {'timestamps': [], 'bytes': [], 'packets': []}
+
+        # Вычисляем разницу между соседними значениями
+        bytes_diff = [self.traffic_history['bytes'][i] - self.traffic_history['bytes'][i-1] 
+                    for i in range(1, len(self.traffic_history['bytes']))]
+        packets_diff = [self.traffic_history['packets'][i] - self.traffic_history['packets'][i-1] 
+                    for i in range(1, len(self.traffic_history['packets']))]
+        timestamps = self.traffic_history['timestamps'][1:]
+
         return {
-            'timestamps': [datetime.now().strftime('%H:%M:%S')],
-            'bytes': [self.byte_count or 100],
-            'packets': [self.packet_count or 10]
+            'timestamps': timestamps,
+            'bytes': bytes_diff,
+            'packets': packets_diff
         }

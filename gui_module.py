@@ -2,7 +2,7 @@ import sys
 from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout,
                             QLabel, QPushButton, QLineEdit, QComboBox,
                             QTableWidget, QTableWidgetItem, QHeaderView,
-                            QFileDialog, QMessageBox)
+                            QFileDialog, QMessageBox, QSplitter)
 from PyQt5.QtCore import Qt, QTimer
 from datetime import datetime
 import matplotlib.pyplot as plt
@@ -10,6 +10,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from loguru import logger
 from typing import List
+import time
 
 class GuiModule(QWidget):
     def __init__(self, capture_module, packet_processing_module, 
@@ -35,7 +36,7 @@ class GuiModule(QWidget):
 
     def init_ui(self):
         self.setWindowTitle('Network Traffic Analyzer')
-        self.setMinimumSize(800, 600)
+        self.setMinimumSize(1000, 700)
         
         # Control Panel
         self.control_panel = QHBoxLayout()
@@ -60,7 +61,11 @@ class GuiModule(QWidget):
         headers = ["Time", "Source IP", "Dest IP", "Protocol", 
                   "Src Port", "Dst Port", "Length", "Info"]
         self.packet_table.setHorizontalHeaderLabels(headers)
-        self.packet_table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+        # self.packet_table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+        self.packet_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.packet_table.verticalHeader().setDefaultSectionSize(20)
+        self.packet_table.setSizeAdjustPolicy(QTableWidget.AdjustToContents)
+    
 
         # Stats Panel
         self.stats_label = QLabel("Statistics:")
@@ -77,21 +82,40 @@ class GuiModule(QWidget):
         self.export_stats_btn = QPushButton("Export Stats")
 
         # Main Layout
+        main_splitter = QSplitter(Qt.Vertical)
+        # таблица
+        table_widget = QWidget()
+        table_layout = QVBoxLayout(table_widget)
+        table_layout.setContentsMargins(0, 0, 0, 0)
+        table_layout.addWidget(self.packet_table, stretch=6)
+        main_splitter.addWidget(table_widget)
+        
+        # графики
+        plots_widget = QWidget()
+        plots_layout = QVBoxLayout(plots_widget)
+        plots_layout.setContentsMargins(0, 0, 0, 0)
+        plots_layout.addWidget(self.canvas, stretch=4)
+        main_splitter.addWidget(plots_widget)
+        
+        main_splitter.setSizes([600, 400])  # 60%/40% от 1000px
+        
         layout = QVBoxLayout()
         layout.addLayout(self.control_panel)
-        layout.addWidget(self.packet_table)
-        layout.addWidget(self.stats_label)
-        layout.addWidget(self.stats_text)
-        layout.addWidget(self.canvas)
-        layout.addLayout(self.export_panel)
+        layout.addWidget(main_splitter)
         self.setLayout(layout)
+
+        # layout = QVBoxLayout()
+        # layout.addLayout(self.control_panel)
+        # layout.addWidget(self.packet_table)
+        # layout.addWidget(self.canvas)  # Оставляем только графики
+        # self.setLayout(layout)
         self.setup_plots()
 
     def setup_connections(self):
         self.start_btn.clicked.connect(self.start_capture)
         self.stop_btn.clicked.connect(self.stop_capture)
-        self.save_pcap_btn.clicked.connect(self.save_to_pcap)
-        self.export_stats_btn.clicked.connect(self.export_stats)
+        # self.save_pcap_btn.clicked.connect(self.save_to_pcap)
+        # self.export_stats_btn.clicked.connect(self.export_stats)
 
     def refresh_interfaces(self):
         self.interface_combo.clear()
@@ -139,6 +163,7 @@ class GuiModule(QWidget):
                 packet_info = self.packet_processing_module.process_packet(packet)
                 if not packet_info:
                     continue
+                self.statistics_module.update_statistics(packet_info)
 
                 items = [
                     datetime.fromtimestamp(packet.time).strftime('%H:%M:%S.%f'),
@@ -188,29 +213,74 @@ class GuiModule(QWidget):
 
     def setup_plots(self):
         """Инициализация области с графиками"""
-        self.plot_widget = QWidget()
-        self.plot_layout = QVBoxLayout(self.plot_widget)
+        self.figure.clear()
+        ax = self.figure.add_subplot(111)
+        ax.text(0.5, 0.5, 'Графики будут здесь', 
+            ha='center', va='center')
+        self.canvas.draw()
+        # self.plot_widget = QWidget()
+        # self.plot_layout = QVBoxLayout(self.plot_widget)
         
-        # График распределения протоколов
-        self.protocol_fig = Figure(figsize=(5, 3))
-        self.protocol_pie = FigureCanvas(self.protocol_fig)
-        self.plot_layout.addWidget(self.protocol_pie)
+        # # График распределения протоколов
+        # self.protocol_fig = Figure(figsize=(5, 3))
+        # self.protocol_pie = FigureCanvas(self.protocol_fig)
+        # self.plot_layout.addWidget(self.protocol_pie)
         
-        # График временной шкалы трафика
-        self.traffic_fig = Figure(figsize=(8, 3))
-        self.traffic_plot = FigureCanvas(self.traffic_fig)
-        self.plot_layout.addWidget(self.traffic_plot)
+        # # График временной шкалы трафика
+        # self.traffic_fig = Figure(figsize=(8, 3))
+        # self.traffic_plot = FigureCanvas(self.traffic_fig)
+        # self.plot_layout.addWidget(self.traffic_plot)
         
-        # self.layout().insertLayout(3, self.plot_layout)  # Добавляем после таблицы
-        plot_container = QWidget()
-        plot_container.setLayout(self.plot_layout)
-        self.layout().insertWidget(3, plot_container)
+        # # self.layout().insertLayout(3, self.plot_layout)  # Добавляем после таблицы
+        # plot_container = QWidget()
+        # plot_container.setLayout(self.plot_layout)
+        # self.layout().insertWidget(3, plot_container)
 
     def update_plots(self):
-        """Обновление всех графиков"""
-        self.update_protocol_pie()
-        self.update_traffic_plot()
+        try:
+            self.figure.clear()
+            
+            # Данные для графиков
+            protocol_data = self.statistics_module.get_protocol_distribution()
+            traffic_data = self.statistics_module.get_traffic_timeline()
+            
+            if not protocol_data or not traffic_data:
+                ax = self.figure.add_subplot(111)
+                ax.text(0.5, 0.5, 'Нет данных для отображения', ha='center', va='center')
+                self.canvas.draw()
+                return
 
+            # График 1: Распределение протоколов
+            ax1 = self.figure.add_subplot(121)
+            if protocol_data:
+                ax1.pie(
+                    protocol_data.values(),
+                    labels=protocol_data.keys(),
+                    autopct='%1.1f%%',
+                    startangle=90
+                )
+                ax1.set_title("Protocol Distribution")
+
+            # График 2: Трафик по времени
+            ax2 = self.figure.add_subplot(122)
+            if traffic_data['timestamps']:
+                ax2.plot(
+                    traffic_data['timestamps'],
+                    traffic_data['bytes'],
+                    'b-', label='Bytes'
+                )
+                ax2.set_xlabel('Time (sec)')
+                ax2.set_ylabel('Bytes per interval')
+                ax2.set_title("Traffic Over Time")
+                ax2.legend(loc='upper left')
+                ax2.grid(True)
+
+            self.figure.tight_layout()  # Чтобы графики не накладывались
+            self.canvas.draw()
+
+        except Exception as e:
+            logger.error(f"Ошибка при обновлении графиков: {e}")
+                
     def update_protocol_pie(self):
         """Обновление круговой диаграммы протоколов"""
         stats = self.statistics_module.get_protocol_distribution()
@@ -245,36 +315,36 @@ class GuiModule(QWidget):
         
         self.traffic_plot.draw()
 
-    def save_to_pcap(self):
-        filename, _ = QFileDialog.getSaveFileName(
-            self, "Save PCAP", "", "PCAP Files (*.pcap)")
+    # def save_to_pcap(self):
+    #     filename, _ = QFileDialog.getSaveFileName(
+    #         self, "Save PCAP", "", "PCAP Files (*.pcap)")
             
-        if filename:
-            packets = [p for p in self.packets if p[1]]
-            if packets:
-                success = self.data_storage_module.save_to_pcap(packets, filename)
-                if success:
-                    QMessageBox.information(self, "Success", f"Saved {len(packets)} packets")
-                else:
-                    QMessageBox.warning(self, "Error", "Failed to save packets")
-            else:
-                QMessageBox.warning(self, "Error", "No packets to save!")
+    #     if filename:
+    #         packets = [p for p in self.packets if p[1]]
+    #         if packets:
+    #             success = self.data_storage_module.save_to_pcap(packets, filename)
+    #             if success:
+    #                 QMessageBox.information(self, "Success", f"Saved {len(packets)} packets")
+    #             else:
+    #                 QMessageBox.warning(self, "Error", "Failed to save packets")
+    #         else:
+    #             QMessageBox.warning(self, "Error", "No packets to save!")
 
-    def export_stats(self):
-        filename, _ = QFileDialog.getSaveFileName(
-            self, "Export Stats", "", "CSV (*.csv)")
+    # def export_stats(self):
+    #     filename, _ = QFileDialog.getSaveFileName(
+    #         self, "Export Stats", "", "CSV (*.csv)")
             
-        if filename:
-            try:
-                stats = self.statistics_module.get_statistics()
-                with open(filename, 'w') as f:
-                    f.write("Category,Value\n")
-                    f.write(f"Total Packets,{stats['packet_count']}\n")
-                    for proto, count in stats['protocol_counts'].items():
-                        f.write(f"{proto} Packets,{count}\n")
-                QMessageBox.information(self, "Success", "Statistics exported")
-            except Exception as e:
-                QMessageBox.critical(self, "Error", f"Export failed: {str(e)}")
+    #     if filename:
+    #         try:
+    #             stats = self.statistics_module.get_statistics()
+    #             with open(filename, 'w') as f:
+    #                 f.write("Category,Value\n")
+    #                 f.write(f"Total Packets,{stats['packet_count']}\n")
+    #                 for proto, count in stats['protocol_counts'].items():
+    #                     f.write(f"{proto} Packets,{count}\n")
+    #             QMessageBox.information(self, "Success", "Statistics exported")
+    #         except Exception as e:
+    #             QMessageBox.critical(self, "Error", f"Export failed: {str(e)}")
 
     def closeEvent(self, event):
         if self.capture_module.running:
