@@ -6,7 +6,7 @@ from scapy.packet import Packet
 
 class DataStorageModule:
     def save_to_pcap(self, packets: Union[List[Packet], Packet], filename: str) -> bool:
-        """Сохраняет пакеты в PCAP-файл с проверкой доступности пути"""
+        """Сохранение в PCAP-файл"""
         try:
             if not packets:
                 logger.warning("No packets to save")
@@ -24,7 +24,7 @@ class DataStorageModule:
             return False
 
     def load_from_pcap(self, filename: str) -> List[Packet]:
-        """Загружает пакеты из PCAP-файла с проверкой его существования"""
+        """Загрузка из PCAP-файла """
         try:
             if not os.path.exists(filename):
                 logger.error(f"File not found: {filename}")

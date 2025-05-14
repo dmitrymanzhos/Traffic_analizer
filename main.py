@@ -17,7 +17,6 @@ class MainModule:
     def __init__(self):
         logger.info("Initializing application modules")
         
-        # Initialize modules with error handling
         try:
             self.capture_module = CaptureModule()
             self.packet_processing_module = PacketProcessingModule()
@@ -36,7 +35,7 @@ class MainModule:
             raise
 
     def start(self):
-        """Start the application GUI"""
+        """Запуск GUI"""
         try:
             self.gui.show()
             logger.info("Application started successfully")
@@ -45,7 +44,6 @@ class MainModule:
             raise
 
     def stop(self):
-        """Cleanup resources before exit"""
         logger.info("Stopping application")
         try:
             self.capture_module.stop_capture()
@@ -54,7 +52,7 @@ class MainModule:
 
 def main():
     try:
-        # Configure logging
+        # логи
         logger.add("network_analyzer.log", rotation="1 MB", retention="7 days")
         
         app = QApplication(sys.argv)

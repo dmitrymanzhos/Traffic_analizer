@@ -155,6 +155,7 @@ class GuiModule(QWidget):
             if not new_packets:
                 return
 
+            self.packet_table.setSortingEnabled(False)
             self.packet_table.setUpdatesEnabled(False)
             current_row_count = self.packet_table.rowCount()
             self.packet_table.setRowCount(current_row_count + len(new_packets))
@@ -168,12 +169,14 @@ class GuiModule(QWidget):
                 info_text = ""
                 if packet_info.get('http_host'):
                     info_text = f"HTTP: {packet_info['http_host']}"
+                elif packet_info.get('https_host'):
+                    info_text = f"HTTPS: {packet_info['tls_sni']}"
                 elif packet_info.get('dns_query'):
                     info_text = f"DNS: {packet_info['dns_query']}"
                 elif packet_info.get('protocol') == 'TCP':
                     info_text = "TCP"  # Общая информация для TCP, если нет HTTP
-                else:
-                    info_text = packet_info.get('protocol', '')
+                elif packet_info.get('protocol'):
+                    info_text = packet_info['protocol']
                     
                 items = [
                     datetime.fromtimestamp(packet.time).strftime('%H:%M:%S.%f'),
@@ -192,6 +195,7 @@ class GuiModule(QWidget):
                     self.packet_table.setItem(i, col, item)
 
             self.packet_table.setUpdatesEnabled(True)
+            self.packet_table.setSortingEnabled(True)
             self.update_statistics()
             self.update_plots()
             

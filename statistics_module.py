@@ -10,7 +10,6 @@ class StatisticsModule:
         self.traffic_history = {'timestamps': [], 'bytes': [], 'packets': []}
 
     def reset_statistics(self) -> None:
-        """Reset all statistics counters"""
         self.packet_count: int = 0
         self.byte_count: int = 0
         self.start_time: float = time.time()
@@ -22,7 +21,7 @@ class StatisticsModule:
         logger.info("Statistics reset")
 
     def update_statistics(self, packet_info: Dict[str, Any]) -> None:
-        """Update statistics with new packet info"""
+        """Обновление статистики зля каждого нового пакета"""
         if not packet_info:
             return
 
@@ -36,29 +35,28 @@ class StatisticsModule:
             self.traffic_history['bytes'].append(self.byte_count)
             self.traffic_history['packets'].append(self.packet_count)
             
-            # Protocol statistics
+            # о протоколе
             protocol = packet_info.get('protocol', 'unknown')
             self.protocol_counts[protocol] += 1
 
-            # IP direction statistics
+            # об IP
             src_ip = packet_info.get('src_ip', '')
             dst_ip = packet_info.get('dst_ip', '')
             if src_ip and dst_ip:
                 self.ip_counts[src_ip]['out'] += 1
                 self.ip_counts[dst_ip]['in'] += 1
 
-            # Port statistics
+            # порт
             if 'src_port' in packet_info and 'dst_port' in packet_info:
                 self.port_counts[packet_info['src_port']]['out'] += 1
                 self.port_counts[packet_info['dst_port']]['in'] += 1
 
-            # Application detection
             if packet_info.get('http_info'):
                 self.application_counts['HTTP'] += 1
             elif protocol == 'DNS':
                 self.application_counts['DNS'] += 1
 
-            # TCP stream tracking
+            # TCP потоки
             if protocol == 'TCP' and 'stream_key' in packet_info:
                 stream_key = packet_info['stream_key']
                 if stream_key not in self.stream_statistics:
@@ -75,8 +73,7 @@ class StatisticsModule:
         except Exception as e:
             logger.error(f"Error updating statistics: {e}")
 
-    def get_statistics(self) -> Dict[str, Any]:
-        """Return current statistics snapshot"""
+    def get_statistics(self):
         return {
             'packet_count': self.packet_count,
             'byte_count': self.byte_count,
@@ -89,7 +86,7 @@ class StatisticsModule:
         }
 
     def generate_report(self) -> str:
-        """Generate HTML report with current statistics"""
+        """TODO: HTML отчет"""
         stats = self.get_statistics()
         report = [
             "<html><body>",
@@ -117,16 +114,14 @@ class StatisticsModule:
         return "\n".join(report)
 
     def get_protocol_distribution(self):
-        # Добавьте тестовые данные для проверки
         # return {'TCP': 15, 'UDP': 5, 'ICMP': 3} if not self.protocol_counts else dict(self.protocol_counts)
         return dict(self.protocol_counts)
 
     def get_traffic_timeline(self):
-        """Возвращает временную шкалу трафика с инкрементальными значениями"""
+        """Возвращает временную шкалу для графика"""
         if len(self.traffic_history['timestamps']) < 2:
             return {'timestamps': [], 'bytes': [], 'packets': []}
 
-        # Вычисляем разницу между соседними значениями
         bytes_diff = [self.traffic_history['bytes'][i] - self.traffic_history['bytes'][i-1] 
                     for i in range(1, len(self.traffic_history['bytes']))]
         packets_diff = [self.traffic_history['packets'][i] - self.traffic_history['packets'][i-1] 
