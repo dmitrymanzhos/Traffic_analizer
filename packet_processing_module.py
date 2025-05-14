@@ -14,16 +14,18 @@ class PacketProcessingModule:
             'last_activity': None
         })
 
-    def process_packet(self, packet: Packet) -> Optional[Dict]:
+    def process_packet(self, packet: Packet):
         """Process raw network packet and extract key information"""
         try:
-            # Basic protocol check
             if not (packet.haslayer(IP) or packet.haslayer(IPv6)):
                 return None
 
             ip_layer = packet[IP] if packet.haslayer(IP) else packet[IPv6]
             protocol = ip_layer.proto
             
+            if not hasattr(ip_layer, 'proto'):
+                return None
+                
             # Base packet info
             packet_info = {
                 'src_ip': ip_layer.src,

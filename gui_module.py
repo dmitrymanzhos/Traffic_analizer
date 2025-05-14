@@ -85,6 +85,7 @@ class GuiModule(QWidget):
         layout.addWidget(self.canvas)
         layout.addLayout(self.export_panel)
         self.setLayout(layout)
+        self.setup_plots()
 
     def setup_connections(self):
         self.start_btn.clicked.connect(self.start_capture)
@@ -173,16 +174,76 @@ class GuiModule(QWidget):
             text += f"  {proto}: {count}<br>"
         self.stats_text.setText(text)
 
-    def update_plots(self):
-        stats = self.statistics_module.get_statistics()
-        self.figure.clear()
-        ax = self.figure.add_subplot(111)
+    # def update_plots(self):
+    #     stats = self.statistics_module.get_statistics()
+    #     self.figure.clear()
+    #     ax = self.figure.add_subplot(111)
         
-        if stats['protocol_counts']:
-            ax.bar(stats['protocol_counts'].keys(), 
-                  stats['protocol_counts'].values())
-            ax.set_title("Traffic by Protocol")
-            self.canvas.draw()
+    #     if stats['protocol_counts']:
+    #         ax.bar(stats['protocol_counts'].keys(), 
+    #               stats['protocol_counts'].values())
+    #         ax.set_title("Traffic by Protocol")
+    #         self.canvas.draw()
+
+
+    def setup_plots(self):
+        """Инициализация области с графиками"""
+        self.plot_widget = QWidget()
+        self.plot_layout = QVBoxLayout(self.plot_widget)
+        
+        # График распределения протоколов
+        self.protocol_fig = Figure(figsize=(5, 3))
+        self.protocol_pie = FigureCanvas(self.protocol_fig)
+        self.plot_layout.addWidget(self.protocol_pie)
+        
+        # График временной шкалы трафика
+        self.traffic_fig = Figure(figsize=(8, 3))
+        self.traffic_plot = FigureCanvas(self.traffic_fig)
+        self.plot_layout.addWidget(self.traffic_plot)
+        
+        # self.layout().insertLayout(3, self.plot_layout)  # Добавляем после таблицы
+        plot_container = QWidget()
+        plot_container.setLayout(self.plot_layout)
+        self.layout().insertWidget(3, plot_container)
+
+    def update_plots(self):
+        """Обновление всех графиков"""
+        self.update_protocol_pie()
+        self.update_traffic_plot()
+
+    def update_protocol_pie(self):
+        """Обновление круговой диаграммы протоколов"""
+        stats = self.statistics_module.get_protocol_distribution()
+        if not stats or len(stats) < 1:
+            return
+        
+        self.protocol_fig.clear()
+        ax = self.protocol_fig.add_subplot(111)
+        
+        ax.pie(stats.values(), labels=stats.keys(), autopct='%1.1f%%')
+        ax.set_title("Protocol Distribution")
+        self.protocol_pie.draw()
+
+    def update_traffic_plot(self):
+        """Обновление графика трафика"""
+        timeline = self.statistics_module.get_traffic_timeline()
+        if not timeline['timestamps']:
+            return
+        
+        fig = self.traffic_plot.figure
+        fig.clear()
+        ax = fig.add_subplot(111)
+        
+        ax.plot(timeline['timestamps'], timeline['bytes'], label='Bytes')
+        ax.plot(timeline['timestamps'], timeline['packets'], label='Packets')
+        
+        ax.set_xlabel('Time')
+        ax.set_ylabel('Count')
+        ax.set_title("Traffic Timeline")
+        ax.legend()
+        ax.grid(True)
+        
+        self.traffic_plot.draw()
 
     def save_to_pcap(self):
         filename, _ = QFileDialog.getSaveFileName(
@@ -229,3 +290,9 @@ class GuiModule(QWidget):
         self.timer.stop()
         self.main_module.stop()
         event.accept()
+
+    # def showEvent(self, event):
+    #     # Временно для теста
+    #     self.update_protocol_pie()
+    #     self.update_traffic_plot()
+    #     super().showEvent(event)
