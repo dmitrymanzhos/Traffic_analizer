@@ -8,6 +8,7 @@ from data_storage_module import DataStorageModule
 from statistics_module import StatisticsModule
 from gui_module import GuiModule
 from loguru import logger
+import atexit
 
 # Configure runtime directory for Linux systems
 os.makedirs(os.environ.get('XDG_RUNTIME_DIR', f'/tmp/runtime-{os.getuid()}'), 
@@ -22,6 +23,8 @@ class MainModule:
             self.packet_processing_module = PacketProcessingModule()
             self.data_storage_module = DataStorageModule()
             self.statistics_module = StatisticsModule()
+
+            atexit.register(self._save_on_exit) # обработчик завершения
             
             self.gui = GuiModule(
                 self.capture_module,
@@ -30,6 +33,8 @@ class MainModule:
                 self.statistics_module,
                 self
             )
+            # atexit.register(self._save_before_exit)  # Автосохранение
+
         except Exception as e:
             logger.critical(f"Module initialization failed: {e}")
             raise
@@ -49,6 +54,25 @@ class MainModule:
             self.capture_module.stop_capture()
         except Exception as e:
             logger.error(f"Error during cleanup: {e}")
+
+    # def _save_before_exit(self):
+    #     packets = self.capture_module.get_packets()
+    #     if packets:
+    #         self.data_storage_module.save_session_to_pcap(
+    #             packets,
+    #             f"capture_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pcap"
+    #         )
+    
+    def _save_on_exit(self):
+        """Автоматическое сохранение при завершении"""
+        if hasattr(self, 'capture_module'):
+            packets = self.capture_module.get_all_packets()
+            if packets:
+                logger.info(f"Saving {len(packets)} packets before exit")
+                self.data_storage_module.save_session_to_pcap(packets)
+            else:
+                logger.info("No packets to save on exit")
+
 
 def main():
     try:

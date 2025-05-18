@@ -11,6 +11,7 @@ class CaptureModule:
         self.packet_queue = queue.Queue(maxsize=10000) 
         self.interface = None
         self.bpf_filter = ""
+        self.captured_packets = []
 
     def get_interfaces(self):
         """Возвращает список сетевых интерфейсов, исключая loopback"""
@@ -54,7 +55,10 @@ class CaptureModule:
             sniff(
                 iface=self.interface,
                 filter=self.bpf_filter,
-                prn=lambda pkt: self.packet_queue.put(pkt, block=False),
+                prn=lambda pkt: (
+                    self.packet_queue.put(pkt, block=False),
+                    self.captured_packets.append(pkt)
+                ),
                 store=False,
                 stop_filter=lambda _: not self.running
             )
@@ -81,6 +85,18 @@ class CaptureModule:
         while not self.packet_queue.empty():
             try:
                 packets.append(self.packet_queue.get_nowait())
+            except queue.Empty:
+                break
+        return packets
+    
+    def get_all_packets(self):
+        """Возвращает все захваченные пакеты"""
+        packets = list(self.captured_packets) 
+        while not self.packet_queue.empty():
+            try:
+                packet = self.packet_queue.get_nowait()
+                packets.append(packet)
+                self.captured_packets.append(packet)
             except queue.Empty:
                 break
         return packets

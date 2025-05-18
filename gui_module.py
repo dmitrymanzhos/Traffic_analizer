@@ -46,6 +46,7 @@ class GuiModule(QWidget):
         self.filter_edit.setPlaceholderText("tcp port 80")
         self.start_btn = QPushButton("Start Capture")
         self.stop_btn = QPushButton("Stop Capture")
+        self.save_btn = QPushButton("Save PCAP Now")
         self.stop_btn.setEnabled(False)
         
         self.control_panel.addWidget(QLabel("Interface:"))
@@ -54,8 +55,10 @@ class GuiModule(QWidget):
         self.control_panel.addWidget(self.filter_edit)
         self.control_panel.addWidget(self.start_btn)
         self.control_panel.addWidget(self.stop_btn)
+        self.control_panel.addWidget(self.save_btn)
 
-        # Packet Table
+
+        # Таблица пакетов
         self.packet_table = QTableWidget()
         self.packet_table.setColumnCount(9)
         headers = ["Time", "Source IP", "Dest IP", "Protocol", 
@@ -114,6 +117,7 @@ class GuiModule(QWidget):
     def setup_connections(self):
         self.start_btn.clicked.connect(self.start_capture)
         self.stop_btn.clicked.connect(self.stop_capture)
+        self.save_btn.clicked.connect(self.save_current_session)
         # self.save_pcap_btn.clicked.connect(self.save_to_pcap)
         # self.export_stats_btn.clicked.connect(self.export_stats)
 
@@ -350,6 +354,19 @@ class GuiModule(QWidget):
         ax.grid(True)
         
         self.traffic_plot.draw()
+    
+    def save_current_session(self):
+        """Ручное сохранение текущих пакетов"""
+        packets = self.capture_module.get_all_packets()
+        if packets:
+            filename, _ = QFileDialog.getSaveFileName(
+                self, "Save PCAP", "", "PCAP Files (*.pcap)")
+            if filename:
+                if self.data_storage_module.save_to_pcap(packets, filename):
+                    QMessageBox.information(self, "Success", 
+                        f"Saved {len(packets)} packets")
+        else:
+            QMessageBox.warning(self, "Warning", "No packets to save")
 
     # def save_to_pcap(self):
     #     filename, _ = QFileDialog.getSaveFileName(

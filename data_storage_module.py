@@ -22,6 +22,19 @@ class DataStorageModule:
         except Exception as e:
             logger.error(f"PCAP save error: {e}")
             return False
+    
+    def save_session_to_pcap(self, packets: List[Packet], prefix="capture") -> bool:
+        """Автоматическое сохранение сессии с timestamp"""
+        try:
+            if not packets:
+                logger.warning("No packets to save in session")
+                return False
+                
+            filename = f"{prefix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pcap"
+            return self.save_to_pcap(packets, filename) # используем прошлый метод
+        except Exception as e:
+            logger.error(f"Session save error: {e}")
+            return False
 
     def load_from_pcap(self, filename: str) -> List[Packet]:
         """Загрузка из PCAP-файла """
@@ -36,3 +49,7 @@ class DataStorageModule:
         except Exception as e:
             logger.error(f"PCAP load error: {e}")
             return []
+    
+    def save_session_to_pcap(self, packets: list, filename="session.pcap") -> bool:
+        """Сохраняет все пакеты сессии в файл"""
+        return self.save_to_pcap(packets, filename)
