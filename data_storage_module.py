@@ -3,6 +3,7 @@ import os
 from loguru import logger
 from typing import List, Optional, Union
 from scapy.packet import Packet
+from datetime import datetime
 
 class DataStorageModule:
     def save_to_pcap(self, packets: Union[List[Packet], Packet], filename: str) -> bool:
@@ -50,6 +51,6 @@ class DataStorageModule:
             logger.error(f"PCAP load error: {e}")
             return []
     
-    def save_session_to_pcap(self, packets: list, filename="session.pcap") -> bool:
-        """Сохраняет все пакеты сессии в файл"""
-        return self.save_to_pcap(packets, filename)
+    # def save_session_to_pcap(self, packets: list, filename="session.pcap") -> bool:
+    #     """Сохраняет все пакеты сессии в файл"""
+    #     return self.save_to_pcap(packets, filename)

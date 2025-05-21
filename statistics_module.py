@@ -5,7 +5,8 @@ from typing import Dict, Any, DefaultDict
 from loguru import logger
 
 class StatisticsModule:
-    def __init__(self):
+    def __init__(self, packet_processing_module):
+        self.packet_processing_module = packet_processing_module
         self.reset_statistics()
         self.traffic_history = {'timestamps': [], 'bytes': [], 'packets': []}
 
@@ -60,19 +61,45 @@ class StatisticsModule:
             if protocol == 'TCP' and 'stream_key' in packet_info:
                 stream_key = packet_info['stream_key']
                 if stream_key not in self.stream_statistics:
-                    self.stream_statistics[stream_key] = {
-                        'start_time': datetime.now(),
-                        'packet_count': 0,
-                        'byte_count': 0,
-                        'src': f"{src_ip}:{packet_info.get('src_port', '')}",
-                        'dst': f"{dst_ip}:{packet_info.get('dst_port', '')}"
-                    }
+                    self._init_stream_stats(stream_key, packet_info)
+
+
+                if hasattr(self, 'packet_processing_module'):
+                    stream_data = self.packet_processing_module.tcp_streams.get(stream_key, {})
+                    self.stream_statistics[stream_key]['state'] = stream_data.get('state', 'UNKNOWN')
+
+                # self.stream_statistics[stream_key]['state'] = self.packet_processing_module.tcp_streams[stream_key]['state']
                 self.stream_statistics[stream_key]['packet_count'] += 1
                 self.stream_statistics[stream_key]['byte_count'] += payload_len
 
         except Exception as e:
             logger.error(f"Error updating statistics: {e}")
 
+    def _init_stream_stats(self, stream_key: str, packet_info: Dict):
+        """Инициализация статистики для нового потока"""
+        self.stream_statistics[stream_key] = {
+            'src': f"{packet_info['src_ip']}:{packet_info['src_port']}",
+            'dst': f"{packet_info['dst_ip']}:{packet_info['dst_port']}",
+            'start_time': datetime.now(),
+            'packet_count': 0,
+            'byte_count': 0,
+            'state': 'NEW',
+            'retransmissions': 0
+        }
+
+    def get_stream_health_stats(self):
+        """Статистика для потока"""
+        return {
+            'total': len(self.stream_statistics),
+            'established': sum(1 for s in self.stream_statistics.values() 
+                             if s.get('state') == 'ESTABLISHED'),
+            'problems': {
+                'timeouts': sum(1 for s in self.stream_statistics.values() 
+                              if s.get('state') == 'TIMEOUT'),
+                'aborted': sum(1 for s in self.stream_statistics.values() 
+                             if s.get('state') == 'ABORTED')
+            }
+        }
     def get_statistics(self):
         return {
             'packet_count': self.packet_count,

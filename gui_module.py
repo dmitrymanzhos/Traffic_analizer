@@ -2,7 +2,7 @@ import sys
 from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout,
                             QLabel, QPushButton, QLineEdit, QComboBox,
                             QTableWidget, QTableWidgetItem, QHeaderView,
-                            QFileDialog, QMessageBox, QSplitter)
+                            QFileDialog, QMessageBox, QSplitter, QTabWidget)
 from PyQt5.QtCore import Qt, QTimer
 from datetime import datetime
 import matplotlib.pyplot as plt
@@ -36,83 +36,90 @@ class GuiModule(QWidget):
 
     def init_ui(self):
         self.setWindowTitle('Network Traffic Analyzer')
-        self.setMinimumSize(1000, 700)
+        self.setMinimumSize(1200, 800)
         
-        # Control Panel
-        self.control_panel = QHBoxLayout()
+        # Главный layout
+        layout = QVBoxLayout()
+        
+        # Панель управления
+        self.setup_control_panel(layout)
+        
+        # Создаем виджет с вкладками
+        self.tab_widget = QTabWidget()
+        
+        # Вкладка с пакетами
+        self.packet_table = self.create_packet_table()
+        self.tab_widget.addTab(self.packet_table, "Packets")
+        
+        # Вкладка с TCP потоками
+        self.streams_table = self.create_streams_table()
+        self.tab_widget.addTab(self.streams_table, "TCP Streams")
+        
+        layout.addWidget(self.tab_widget)
+        
+        # Графики
+        self.figure = Figure()
+        self.canvas = FigureCanvas(self.figure)
+        layout.addWidget(self.canvas)
+        
+        self.setLayout(layout)
+        self.setup_plots()
+
+    def setup_control_panel(self, layout):
+        """Настройка панели управления"""
+        control_panel = QHBoxLayout()
+        
+        # Элементы управления (как в вашем исходном коде)
         self.interface_combo = QComboBox()
         self.refresh_interfaces()
+        
         self.filter_edit = QLineEdit()
         self.filter_edit.setPlaceholderText("tcp port 80")
+        
         self.start_btn = QPushButton("Start Capture")
         self.stop_btn = QPushButton("Stop Capture")
         self.save_btn = QPushButton("Save PCAP Now")
         self.stop_btn.setEnabled(False)
         
-        self.control_panel.addWidget(QLabel("Interface:"))
-        self.control_panel.addWidget(self.interface_combo)
-        self.control_panel.addWidget(QLabel("BPF Filter:"))
-        self.control_panel.addWidget(self.filter_edit)
-        self.control_panel.addWidget(self.start_btn)
-        self.control_panel.addWidget(self.stop_btn)
-        self.control_panel.addWidget(self.save_btn)
-
-
-        # Таблица пакетов
-        self.packet_table = QTableWidget()
-        self.packet_table.setColumnCount(9)
-        headers = ["Time", "Source IP", "Dest IP", "Protocol", 
-                  "Src Port", "Dst Port", "Length", "Info", "TCP flags"]
-        self.packet_table.setHorizontalHeaderLabels(headers)
-        # self.packet_table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
-        self.packet_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.packet_table.verticalHeader().setDefaultSectionSize(20)
-        self.packet_table.setSizeAdjustPolicy(QTableWidget.AdjustToContents)
-    
-
-        # Stats Panel
-        self.stats_label = QLabel("Statistics:")
-        self.stats_text = QLabel("No data captured")
-        self.stats_text.setWordWrap(True)
-
-        # Visualization
-        self.figure = Figure()
-        self.canvas = FigureCanvas(self.figure)
+        control_panel.addWidget(QLabel("Interface:"))
+        control_panel.addWidget(self.interface_combo)
+        control_panel.addWidget(QLabel("BPF Filter:"))
+        control_panel.addWidget(self.filter_edit)
+        control_panel.addWidget(self.start_btn)
+        control_panel.addWidget(self.stop_btn)
+        control_panel.addWidget(self.save_btn)
         
-        # Export Panel
-        self.export_panel = QHBoxLayout()
-        self.save_pcap_btn = QPushButton("Save PCAP")
-        self.export_stats_btn = QPushButton("Export Stats")
+        layout.addLayout(control_panel)
 
-        # Main Layout
-        main_splitter = QSplitter(Qt.Vertical)
-        # таблица
-        table_widget = QWidget()
-        table_layout = QVBoxLayout(table_widget)
-        table_layout.setContentsMargins(0, 0, 0, 0)
-        table_layout.addWidget(self.packet_table, stretch=6)
-        main_splitter.addWidget(table_widget)
-        
-        # графики
-        plots_widget = QWidget()
-        plots_layout = QVBoxLayout(plots_widget)
-        plots_layout.setContentsMargins(0, 0, 0, 0)
-        plots_layout.addWidget(self.canvas, stretch=4)
-        main_splitter.addWidget(plots_widget)
-        
-        main_splitter.setSizes([600, 400])  # 60%/40% от 1000px
-        
-        layout = QVBoxLayout()
-        layout.addLayout(self.control_panel)
-        layout.addWidget(main_splitter)
-        self.setLayout(layout)
+    def create_packet_table(self):
+        """Создаем таблицу пакетов"""
+        table = QTableWidget()
+        table.setColumnCount(9)
+        table.setHorizontalHeaderLabels([
+            "Time", "Source IP", "Dest IP", "Protocol", 
+            "Src Port", "Dst Port", "Length", "Info", "TCP flags"
+        ])
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        table.verticalHeader().setDefaultSectionSize(20)
+        return table
 
-        # layout = QVBoxLayout()
-        # layout.addLayout(self.control_panel)
-        # layout.addWidget(self.packet_table)
-        # layout.addWidget(self.canvas)  # Оставляем только графики
-        # self.setLayout(layout)
-        self.setup_plots()
+    def create_streams_table(self):
+        """Создаем таблицу TCP потоков"""
+        table = QTableWidget()
+        table.setColumnCount(7)
+        table.setHorizontalHeaderLabels([
+            'ID', 'Source', 'Destination', 
+            'State', 'Packets', 'Bytes', 'Duration'
+        ])
+        table.setSortingEnabled(True)
+        return table
+
+    def update_all(self):
+        """Обновляем все элементы интерфейса"""
+        self.update_packet_list()
+        self.update_streams_display()
+        self.update_statistics()
+        self.update_plots()
 
     def setup_connections(self):
         self.start_btn.clicked.connect(self.start_capture)
@@ -132,27 +139,54 @@ class GuiModule(QWidget):
             logger.error(f"Interface refresh failed: {e}")
             QMessageBox.critical(self, "Error", f"Failed to get interfaces: {str(e)}")
 
-    def start_capture(self):
-        iface = self.interface_combo.currentText()
-        bpf_filter = self.filter_edit.text()
+    # def start_capture(self):
+        # iface = self.interface_combo.currentText()
+        # bpf_filter = self.filter_edit.text()
         
-        if not iface:
-            QMessageBox.warning(self, "Error", "Select network interface!")
-            return
+        # if not iface:
+        #     QMessageBox.warning(self, "Error", "Select network interface!")
+        #     return
             
-        if self.capture_module.start_capture(iface, bpf_filter):
-            self.start_btn.setEnabled(False)
-            self.stop_btn.setEnabled(True)
-            logger.info(f"Capture started on {iface} with filter: {bpf_filter}")
-        else:
-            QMessageBox.critical(self, "Error", "Failed to start capture!")
+        # if self.capture_module.start_capture(iface, bpf_filter):
+        #     self.start_btn.setEnabled(False)
+        #     self.stop_btn.setEnabled(True)
+        #     logger.info(f"Capture started on {iface} with filter: {bpf_filter}")
+        # else:
+        #     QMessageBox.critical(self, "Error", "Failed to start capture!")
+
+    def start_capture(self):
+        try:
+            iface = self.interface_combo.currentText()
+            if not iface:
+                QMessageBox.warning(self, "Error", "Select network interface!")
+                return False
+                
+            if self.capture_module.start_capture(iface, self.filter_edit.text()):
+                self.start_btn.setEnabled(False)
+                self.stop_btn.setEnabled(True)
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"Start capture error: {e}")
+            return False
+        def stop_capture(self):
+            self.capture_module.stop_capture()
+            self.start_btn.setEnabled(True)
+            self.stop_btn.setEnabled(False)
+            logger.info("Capture stopped")
 
     def stop_capture(self):
-        self.capture_module.stop_capture()
-        self.start_btn.setEnabled(True)
-        self.stop_btn.setEnabled(False)
-        logger.info("Capture stopped")
-
+        """Остановка захвата трафика"""
+        try:
+            if hasattr(self, 'capture_module'):
+                self.capture_module.stop_capture()
+                self.start_btn.setEnabled(True)
+                self.stop_btn.setEnabled(False)
+                logger.info("GUI: Capture stopped")
+        except Exception as e:
+            logger.error(f"GUI stop capture error: {e}")
+            QMessageBox.critical(self, "Error", f"Failed to stop capture: {str(e)}")
+            
     def update_packet_list(self):
         try:
             new_packets = self.capture_module.get_packets()
@@ -177,8 +211,8 @@ class GuiModule(QWidget):
                     info_text = f"HTTPS: {packet_info['tls_sni']}"
                 elif packet_info.get('dns_query'):
                     info_text = f"DNS: {packet_info['dns_query']}"
-                elif packet_info.get('protocol') == 'TCP':
-                    info_text = "TCP"  # Общая информация для TCP, если нет HTTP
+                # elif packet_info.get('protocol') == 'TCP':
+                #     info_text = "TCP"  # Общая информация для TCP, если нет HTTP
                 elif packet_info.get('protocol'):
                     info_text = packet_info['protocol']
                 
@@ -222,22 +256,23 @@ class GuiModule(QWidget):
 
             self.packet_table.setUpdatesEnabled(True)
             self.packet_table.setSortingEnabled(True)
-            self.update_statistics()
+            # self.update_statistics()
+            self.update_streams_display() 
             self.update_plots()
             
         except Exception as e:
             logger.error(f"Packet update error: {e}")
 
-    def update_statistics(self):
-        stats = self.statistics_module.get_statistics()
-        text = (
-            f"<b>Packets:</b> {stats['packet_count']}<br>"
-            f"<b>Bytes:</b> {stats['byte_count']}<br>"
-            "<b>Protocols:</b><br>"
-        )
-        for proto, count in stats['protocol_counts'].items():
-            text += f"  {proto}: {count}<br>"
-        self.stats_text.setText(text)
+    # def update_statistics(self):
+    #     stats = self.statistics_module.get_statistics()
+    #     text = (
+    #         f"<b>Packets:</b> {stats['packet_count']}<br>"
+    #         f"<b>Bytes:</b> {stats['byte_count']}<br>"
+    #         "<b>Protocols:</b><br>"
+    #     )
+    #     for proto, count in stats['protocol_counts'].items():
+    #         text += f"  {proto}: {count}<br>"
+    #     self.stats_text.setText(text)
 
     # def update_plots(self):
     #     stats = self.statistics_module.get_statistics()
@@ -354,7 +389,50 @@ class GuiModule(QWidget):
         ax.grid(True)
         
         self.traffic_plot.draw()
-    
+
+    def update_streams_display(self):
+        try:
+            streams = self.packet_processing_module.get_active_streams()
+            self.streams_table.setRowCount(len(streams))
+            
+            for row, (stream_id, data) in enumerate(streams.items()):
+                # Проверка наличия необходимых данных
+                if not all(key in data for key in ['start_time', 'end_time', 'src_ip', 'dst_ip']):
+                    continue
+                    
+                duration = data['end_time'] - data['start_time']
+                packets_count = len(data.get('packets', []))
+                bytes_count = sum(p.get('length', 0) for p in data.get('packets', []))
+                
+                items = [
+                    stream_id[:15],
+                    f"{data['src_ip']}:{data.get('src_port', '')}",
+                    f"{data['dst_ip']}:{data.get('dst_port', '')}",
+                    data.get('state', 'UNKNOWN'),
+                    str(packets_count),
+                    str(bytes_count),
+                    f"{duration:.2f}s",
+                    str(data.get('retransmissions', 0))
+                ]
+                
+                for col, text in enumerate(items):
+                    item = QTableWidgetItem(text)
+                    item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                    self._set_stream_state_color(item, data.get('state'))
+                    self.streams_table.setItem(row, col, item)
+                    
+        except Exception as e:
+            logger.error(f"Error updating streams table: {e}")
+
+    def _set_stream_state_color(self, item, state):
+        """Установка цвета фона в зависимости от состояния потока"""
+        if state == 'ESTABLISHED':
+            item.setBackground(Qt.green)
+        elif state in ('CLOSING', 'TIMEOUT'):
+            item.setBackground(Qt.yellow)
+        elif state == 'ABORTED':
+            item.setBackground(Qt.red)
+        
     def save_current_session(self):
         """Ручное сохранение текущих пакетов"""
         packets = self.capture_module.get_all_packets()
@@ -367,6 +445,19 @@ class GuiModule(QWidget):
                         f"Saved {len(packets)} packets")
         else:
             QMessageBox.warning(self, "Warning", "No packets to save")
+
+
+    # def create_streams_table(self):
+    #     """Создаем таблицу для отображения TCP-потоков"""
+    #     table = QTableWidget()
+    #     table.setColumnCount(7)
+    #     table.setHorizontalHeaderLabels([
+    #         'ID', 'Source', 'Destination', 
+    #         'State', 'Packets', 'Bytes', 'Duration'
+    #     ])
+    #     return table
+        
+
 
     # def save_to_pcap(self):
     #     filename, _ = QFileDialog.getSaveFileName(
@@ -400,7 +491,7 @@ class GuiModule(QWidget):
     #             QMessageBox.critical(self, "Error", f"Export failed: {str(e)}")
 
     def closeEvent(self, event):
-        if self.capture_module.running:
+        if hasattr(self, 'capture_module') and self.capture_module.running:
             reply = QMessageBox.question(
                 self, 'Confirm Exit',
                 'Capture is running. Are you sure you want to exit?',
@@ -410,8 +501,10 @@ class GuiModule(QWidget):
                 event.ignore()
                 return
                 
-        self.timer.stop()
-        self.main_module.stop()
+        if hasattr(self, 'timer'):
+            self.timer.stop()
+        if hasattr(self, 'main_module'):
+            self.main_module.stop()
         event.accept()
 
     # def showEvent(self, event):

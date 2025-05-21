@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import sys
 import os
+from datetime import datetime
+from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QApplication
 from capture_module import CaptureModule
 from packet_processing_module import PacketProcessingModule
@@ -22,7 +24,7 @@ class MainModule:
             self.capture_module = CaptureModule()
             self.packet_processing_module = PacketProcessingModule()
             self.data_storage_module = DataStorageModule()
-            self.statistics_module = StatisticsModule()
+            self.statistics_module = StatisticsModule(self.packet_processing_module)
 
             atexit.register(self._save_on_exit) # обработчик завершения
             
@@ -34,6 +36,10 @@ class MainModule:
                 self
             )
             # atexit.register(self._save_before_exit)  # Автосохранение
+            self.health_check_timer = QTimer()
+            self.health_check_timer.timeout.connect(self.check_connection_health)
+            self.health_check_timer.start(5000)  # Проверка сотстояния потоков каждые 5 секунд
+            
 
         except Exception as e:
             logger.critical(f"Module initialization failed: {e}")
@@ -51,10 +57,13 @@ class MainModule:
     def stop(self):
         logger.info("Stopping application")
         try:
-            self.capture_module.stop_capture()
+            if hasattr(self, 'gui'):
+                self.gui.stop_capture() 
+            if hasattr(self, 'capture_module'):
+                self.capture_module.stop_capture()
         except Exception as e:
             logger.error(f"Error during cleanup: {e}")
-
+            
     # def _save_before_exit(self):
     #     packets = self.capture_module.get_packets()
     #     if packets:
@@ -62,7 +71,20 @@ class MainModule:
     #             packets,
     #             f"capture_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pcap"
     #         )
-    
+
+    def check_connection_health(self):
+        """Проверка состояния соединений"""
+        try:
+            issues = self.packet_processing_module.get_connection_issues()
+            if issues:
+                logger.warning(f"Connection issues detected: {issues}")
+                if 'timeouts' in issues:
+                    self.gui.show_warning(f"Timed out streams: {len(issues['timeouts'])}")
+            return True
+        except Exception as e:
+            logger.error(f"Health check error: {e}")
+            return False
+
     def _save_on_exit(self):
         """Автоматическое сохранение при завершении"""
         if hasattr(self, 'capture_module'):
@@ -77,8 +99,7 @@ class MainModule:
 def main():
     try:
         # логи
-        logger.add("network_analyzer.log", rotation="1 MB", retention="7 days")
-        
+        logger.add("/var/log/network_analyzer.log", rotation="1 MB", retention="7 days")
         app = QApplication(sys.argv)
         main_module = MainModule()
         
